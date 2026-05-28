@@ -1,0 +1,215 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "password": { "type": "string" },
+        "status": { "type": "string" },
+        "name": { "type": "string" },
+        "ispId": { "type": "string" }
+      },
+      "required": ["uid", "email", "password", "role", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System auditable performance and operations logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "performedBy": { "type": "string" }
+      },
+      "required": ["id", "action", "details", "performedBy"]
+    },
+    "ISPPlan": {
+      "title": "ISPPlan",
+      "description": "ISP subscription packages and quota limitations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "maxClients": { "type": "integer" },
+        "priceMonthly": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "maxClients", "priceMonthly"]
+    },
+    "ISP": {
+      "title": "ISP",
+      "description": "Internet Service Provider tenant profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "status": { "type": "string" },
+        "planId": { "type": "string" },
+        "billingType": { "type": "string" },
+        "lastBillingDate": { "type": "string" },
+        "nextBillingDate": { "type": "string" },
+        "customDatabaseSuffix": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "status", "planId", "billingType", "customDatabaseSuffix", "createdAt"]
+    },
+    "ISPClient": {
+      "title": "ISPClient",
+      "description": "Clients managed underneath specific ISPs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ispId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "country": { "type": "string" },
+        "department": { "type": "string" },
+        "municipality": { "type": "string" },
+        "address": { "type": "string" },
+        "documentType": { "type": "string", "enum": ["CC", "CE", "NIT", "PP"] },
+        "documentNumber": { "type": "string" },
+        "bandwidthPlanId": { "type": "string" },
+        "technology": { "type": "string", "enum": ["FTTH", "Wireless"] },
+        "ipConfigType": { "type": "string", "enum": ["Static", "DHCP", "PPPoE"] },
+        "ipAddress": { "type": "string" },
+        "routerId": { "type": "string" },
+        "servicePoint": { "type": "string" },
+        "billingDay": { "type": "integer" },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Suspended"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": [
+        "id", "ispId", "firstName", "lastName", "email", "phoneNumber", 
+        "country", "department", "municipality", "address", 
+        "documentType", "documentNumber", "bandwidthPlanId", "technology", 
+        "ipConfigType", "ipAddress", "routerId", "servicePoint", "billingDay", 
+        "status", "createdAt"
+      ]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Subscription invoices for ISP tenants",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ispId": { "type": "string" },
+        "ispName": { "type": "string" },
+        "amount": { "type": "number" },
+        "billingDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string" },
+        "billingType": { "type": "string" },
+        "planName": { "type": "string" }
+      },
+      "required": ["id", "ispId", "ispName", "amount", "billingDate", "dueDate", "status", "billingType", "planName"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "Global operating settings of the multitenant system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "gracePeriodDays": { "type": "integer" },
+        "suspendOverdue": { "type": "boolean" },
+        "systemBillingEmail": { "type": "string" },
+        "autoInvoicingStatus": { "type": "string" },
+        "smtpHost": { "type": "string" },
+        "smtpPort": { "type": "integer" },
+        "smtpUser": { "type": "string" },
+        "smtpPassword": { "type": "string" },
+        "smtpSecure": { "type": "boolean" },
+        "whatsappApiUrl": { "type": "string" },
+        "whatsappToken": { "type": "string" },
+        "whatsappPhoneId": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "gracePeriodDays", "suspendOverdue", "systemBillingEmail", "autoInvoicingStatus"]
+    },
+    "Router": {
+      "title": "Router",
+      "description": "Networking edge devices (MikroTik) managed by ISPs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ispId": { "type": "string" },
+        "name": { "type": "string" },
+        "host": { "type": "string" },
+        "apiPort": { "type": "integer" },
+        "apiUser": { "type": "string" },
+        "apiPassword": { "type": "string" },
+        "sshPort": { "type": "integer" },
+        "sshUser": { "type": "string" },
+        "sshPassword": { "type": "string" },
+        "httpPort": { "type": "integer" },
+        "useSsl": { "type": "boolean" },
+        "model": { "type": "string" },
+        "version": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "ispId", "name", "host", "apiPort", "apiUser", "status", "createdAt"]
+    },
+    "SSTPConfig": {
+      "title": "SSTPConfig",
+      "description": "SSTP VPN server configuration for ISP network management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ispId": { "type": "string" },
+        "serverAddress": { "type": "string" },
+        "port": { "type": "integer" },
+        "certificateName": { "type": "string" },
+        "status": { "type": "string" },
+        "secretKey": { "type": "string" }
+      },
+      "required": ["id", "ispId", "serverAddress", "port", "certificateName", "status", "secretKey"]
+    }
+  },
+  "firestore": {
+    "config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Global system configuration keys"
+    },
+    "users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit and logs trail"
+    },
+    "plans/{planId}": {
+      "schema": "ISPPlan",
+      "description": "Tenant subscription plans"
+    },
+    "isps/{ispId}": {
+      "schema": "ISP",
+      "description": "ISP Tenant details"
+    },
+    "isp_clients/{clientId}": {
+      "schema": "ISPClient",
+      "description": "Subscribed users under different ISPs"
+    },
+    "invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Billing and receipts history"
+    },
+    "routers/{routerId}": {
+      "schema": "Router",
+      "description": "Network infrastructure devices"
+    },
+    "sstp_configs/{configId}": {
+      "schema": "SSTPConfig",
+      "description": "VPN Gateway settings"
+    }
+  }
+}

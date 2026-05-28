@@ -1,0 +1,6 @@
+{
+  "name": "ISP Core Platform",
+  "description": "Enterprise-grade MultiTenant SaaS platform for ISP infrastructure management, billing, and automation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

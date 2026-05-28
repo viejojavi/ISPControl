@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default safety catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Rules for users collection
+    match /users/{uid} {
+      allow read, write: if true;
+    }
+
+    // Rules for config collection
+    match /config/{configId} {
+      allow read, write: if true;
+    }
+
+    // Rules for logs collection
+    match /logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Rules for plans collection
+    match /plans/{planId} {
+      allow read, write: if true;
+    }
+
+    // Rules for isps collection
+    match /isps/{ispId} {
+      allow read, write: if true;
+    }
+
+    // Rules for isp_clients collection
+    match /isp_clients/{clientId} {
+      allow read, write: if true;
+    }
+
+    // Rules for invoices collection
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+
+    // Rules for routers collection
+    match /routers/{routerId} {
+      allow read, write: if true;
+    }
+
+    // Rules for sstp_configs collection
+    match /sstp_configs/{configId} {
+      allow read, write: if true;
+    }
+  }
+}

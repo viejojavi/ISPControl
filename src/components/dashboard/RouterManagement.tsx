@@ -545,6 +545,48 @@ export default function RouterManagement({ currentUser, onNotification }: Router
     }
   };
 
+  const handleRunConnectivity = async (router: Router) => {
+    setDiagStatus('running');
+    setDiagLogs([]);
+    setDiagParsedData(null);
+    setDiagTab('ping'); // Reusing existing tab structure if possible
+    
+    const logs: string[] = [];
+    const addLog = (msg: string) => {
+      logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+      setDiagLogs([...logs]);
+    };
+    
+    addLog(`INFO: Iniciando Prueba de Conectividad para ${router.name}...`);
+    try {
+      const response = await fetch('/api/mikrotik/connectivity-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          routerIp: router.host, 
+          routerPort: router.apiPort, 
+          user: router.apiUser, 
+          password: router.apiPassword 
+        }),
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        addLog(`ERROR: ${data.error}`);
+        setDiagStatus('failed');
+        return;
+      }
+      
+      addLog(`SUCCESS: Prueba de conectividad completada.`);
+      // Parse results to a readable format for the UI
+      setDiagParsedData(data);
+      setDiagStatus('success');
+    } catch (e: any) {
+      addLog(`ERROR: ${e.message}`);
+      setDiagStatus('failed');
+    }
+  };
+
   const handleRunDiagnostic = async (router: Router, protocol: 'rest' | 'socket' | 'ssh' | 'snmp' | 'ping') => {
     setDiagStatus('running');
     setDiagLogs([]);
@@ -1111,12 +1153,14 @@ export default function RouterManagement({ currentUser, onNotification }: Router
         >
           Routers MikroTik
         </button>
+        {/*
         <button 
           onClick={() => setActiveTab('telemetry')}
           className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'telemetry' ? 'border-blue-500 text-blue-400 bg-blue-500/5' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
         >
           Túneles en Tiempo Real (SSTP)
         </button>
+        */}
         <button 
           onClick={() => setActiveTab('scripts')}
           className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'scripts' ? 'border-blue-500 text-blue-400 bg-blue-500/5' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
@@ -1125,6 +1169,7 @@ export default function RouterManagement({ currentUser, onNotification }: Router
         </button>
       </div>
 
+      {/*
       {activeTab === 'telemetry' && (
         <div className="mt-4">
           <SstpStatusWidget 
@@ -1134,12 +1179,14 @@ export default function RouterManagement({ currentUser, onNotification }: Router
           />
         </div>
       )}
+      */}
 
       {activeTab === 'scripts' && (
         <div className="mt-4">
           <SsstpScriptGenerator 
             routers={routers} 
             sstpServer={sstpConfig?.serverAddress || (typeof window !== 'undefined' ? window.location.host : 'tu-servidor-cloud.com')} 
+            sstpPort={sstpConfig?.port || 443}
           />
         </div>
       )}
@@ -1265,6 +1312,17 @@ export default function RouterManagement({ currentUser, onNotification }: Router
                   <button 
                     onClick={() => {
                       setSelectedRouterForDiag(r);
+                      handleRunConnectivity(r);
+                    }}
+                    className="flex-1 py-1.5 px-2 bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 rounded-xl hover:bg-emerald-600 hover:text-white hover:border-emerald-500 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 shrink-0"
+                    title="Prueba de Conectividad a Internet"
+                  >
+                    <Wifi size={12} />
+                    Ping
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setSelectedRouterForDiag(r);
                       handleRunDiagnostic(r, 'socket');
                     }}
                     className="flex-1 py-1.5 px-2 bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 rounded-xl hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
@@ -1298,13 +1356,13 @@ export default function RouterManagement({ currentUser, onNotification }: Router
                   </button>
                 </div>
 
-                {/* 5. GENERAL ACTIONS TOOLBAR - SPANS 1 COL */}
-                <div className="flex items-center justify-between sm:justify-end xl:justify-end xl:col-span-1 border-t sm:border-t-0 xl:border-t-0 border-gray-800/40 pt-3.5 sm:pt-0 xl:pt-0 shrink-0">
+                {/* 5. GENERAL ACTIONS TOOLBAR - SPANS ALL COLS AT BOTTOM ON XL */}
+                <div className="flex items-center justify-between xl:justify-end xl:col-span-12 border-t border-gray-800/40 pt-3.5 mt-2 shrink-0">
                   <span className="sm:hidden xl:hidden text-gray-500 text-[10px] font-bold uppercase tracking-wider">Acciones</span>
-                  <div className="flex items-center gap-1 bg-gray-900/65 px-1.5 py-1 rounded-xl border border-gray-800/60">
+                  <div className="flex items-center gap-1.5 bg-gray-900/65 px-1 py-1 rounded-xl border border-gray-800/60">
                     <button 
                       onClick={() => openEditDrawer(r)}
-                      className="p-1.5 bg-gray-800/30 hover:bg-gray-800 hover:text-blue-400 rounded-lg text-gray-400 transition-all cursor-pointer"
+                      className="p-1.5 bg-gray-800/30 hover:bg-gray-800 hover:text-blue-400 rounded-lg text-gray-400 transition-all cursor-pointer shrink-0"
                       title="Editar Router"
                     >
                       <Settings size={13} />
@@ -1312,14 +1370,15 @@ export default function RouterManagement({ currentUser, onNotification }: Router
                     <button 
                       onClick={() => handleSyncRouter(r)}
                       disabled={syncingRouterId === r.id}
-                      className="p-1.5 bg-gray-800/30 hover:bg-gray-800 hover:text-blue-400 rounded-lg text-gray-400 transition-all disabled:opacity-50 cursor-pointer"
+                      className="p-1.5 bg-gray-800/30 hover:bg-gray-800 hover:text-blue-400 rounded-lg text-gray-400 transition-all disabled:opacity-50 cursor-pointer shrink-0"
                       title="Forzar Sincronización"
                     >
                       <RefreshCw size={13} className={syncingRouterId === r.id ? 'animate-spin' : ''} />
                     </button>
+                    <div className="w-px h-4 bg-gray-700/50 mx-0.5" />
                     <button 
                       onClick={() => handleDeleteRouter(r.id, r.name)}
-                      className="p-1.5 bg-gray-800/30 hover:bg-rose-950 hover:text-rose-400 rounded-lg text-gray-400 transition-all cursor-pointer"
+                      className="p-1.5 bg-gray-800/30 hover:bg-rose-950 hover:text-rose-400 rounded-lg text-gray-400 transition-all cursor-pointer shrink-0"
                       title="Remover Registros"
                     >
                       <Trash2 size={13} />
@@ -2373,9 +2432,10 @@ export default function RouterManagement({ currentUser, onNotification }: Router
 interface SsstpScriptGeneratorProps {
   routers: Router[];
   sstpServer: string;
+  sstpPort: number;
 }
 
-function SsstpScriptGenerator({ routers, sstpServer }: SsstpScriptGeneratorProps) {
+function SsstpScriptGenerator({ routers, sstpServer, sstpPort }: SsstpScriptGeneratorProps) {
   const [selectedRouterId, setSelectedRouterId] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [copiedExtra, setCopiedExtra] = useState(false);
@@ -2429,7 +2489,7 @@ function SsstpScriptGenerator({ routers, sstpServer }: SsstpScriptGeneratorProps
 
 /interface sstp-client add name="sstp-cloud-connection" \\
     connect-to="${serverHost}" \\
-    port=443 \\
+    port=${sstpPort || 443} \\
     user="${sstpUser}" \\
     password="${sstpPass}" \\
     profile="SSTP-Cloud-Profile" \\
@@ -2579,8 +2639,8 @@ PersistentKeepalive = 25`;
 
   // --- 4. CGNAT REVERSE TUNNEL LINK SYSTEM ---
   const cgnatScriptText = `/interface sstp-client add name="cgnat-sstp" \\
-    connect-to="[SU_IP_PÚBLICA_O_DNS_DE_VPS_AQUI]" \\
-    port=443 \\
+    connect-to="${serverHost}" \\
+    port=${sstpPort || 443} \\
     user="${sstpUser}" \\
     password="${sstpPass}" \\
     profile="default-encryption" \\

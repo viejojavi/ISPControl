@@ -14,7 +14,8 @@ import {
   CreditCard,
   Zap,
   Clock,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { 
@@ -36,8 +37,12 @@ import {
   Invoice,
   getISPRouters,
   getISPClients,
-  getAllInvoices
+  getAllInvoices,
+  getAuditLogs,
+  AuditLog
 } from '../../lib/userService';
+import { NetworkMonitoring } from './NetworkMonitoring';
+import ConnectivityReport from './ConnectivityReport';
 
 interface OverviewDashboardProps {
   currentUser: UserAccount;
@@ -47,6 +52,7 @@ export default function OverviewDashboard({ currentUser }: OverviewDashboardProp
   const [routers, setRouters] = useState<Router[]>([]);
   const [clients, setClients] = useState<ISPClient[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [alerts, setAlerts] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Mocked trend data for "attractive graphics"
@@ -64,14 +70,16 @@ export default function OverviewDashboard({ currentUser }: OverviewDashboardProp
     const fetchData = async () => {
       if (!currentUser.ispId) return;
       try {
-        const [rRes, cRes, invRes] = await Promise.all([
+        const [rRes, cRes, invRes, logs] = await Promise.all([
           getISPRouters(currentUser.ispId),
           getISPClients(currentUser.ispId),
-          getAllInvoices()
+          getAllInvoices(),
+          getAuditLogs(10)
         ]);
         setRouters(rRes);
         setClients(cRes);
         setInvoices(invRes.filter(inv => inv.ispId === currentUser.ispId));
+        setAlerts(logs.filter(log => log.action.includes('Error') || log.action.includes('Suspended') || log.action.includes('CRÍTICO')));
       } catch (err) {
         console.error('Error fetching dashboard summary:', err);
       } finally {
@@ -94,7 +102,12 @@ export default function OverviewDashboard({ currentUser }: OverviewDashboardProp
   const onlineRouters = routers.filter(r => r.status === 'Online').length;
   const offlineRouters = routers.length - onlineRouters;
   const activeClients = clients.filter(c => c.status === 'Active').length;
-  const pendingInvoices = invoices.filter(inv => inv.status === 'Pending').length; // Or logic for unpaid
+  
+  // Calculate average CPU Load
+  const routersWithCpu = routers.filter(r => r.cpuLoad !== undefined && r.status === 'Online');
+  const avgCpu = routersWithCpu.length > 0 
+    ? Math.round(routersWithCpu.reduce((sum, r) => sum + parseInt(r.cpuLoad || '0'), 0) / routersWithCpu.length)
+    : 0;
   
   // router status data for pie chart
   const routerData = [
@@ -116,23 +129,47 @@ export default function OverviewDashboard({ currentUser }: OverviewDashboardProp
   return (
     <div className="space-y-6">
       {/* Top Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/5 p-6 rounded-3xl border border-blue-500/10">
-        <div>
-          <h2 className="text-xl font-black text-white tracking-tight">Bienvenido al Centro de Control</h2>
-          <p className="text-gray-400 text-xs mt-1">Sincronización en tiempo real de todos sus microservicios e infraestructura.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Sistemas OK</span>
+      {/* ... keeping existing structure ... */}
+      
+      {/* New Summary Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#161b22] border border-gray-800 rounded-3xl p-6 shadow-xl">
+             <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                    <Server size={18} />
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Estado Dispositivos</h3>
+             </div>
+             <p className="text-3xl font-black text-white">{onlineRouters} <span className="text-sm text-gray-500 font-normal">/ {routers.length} Online</span></p>
           </div>
-          <div className="px-4 py-2 bg-gray-900/60 border border-gray-800 rounded-xl flex items-center gap-2">
-            <Clock size={14} className="text-gray-500" />
-            <span className="text-[10px] font-mono text-gray-300">{new Date().toLocaleTimeString()}</span>
-          </div>
-        </div>
-      </div>
 
+          <div className="bg-[#161b22] border border-gray-800 rounded-3xl p-6 shadow-xl">
+             <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400">
+                    <Cpu size={18} />
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Uso Global CPU</h3>
+             </div>
+             <p className="text-3xl font-black text-white">{avgCpu}% <span className="text-sm text-gray-500 font-normal">Promedio</span></p>
+          </div>
+
+          <div className="bg-[#161b22] border border-gray-800 rounded-3xl p-6 shadow-xl">
+             <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400">
+                    <AlertTriangle size={18} />
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Alertas Críticas</h3>
+             </div>
+             <p className="text-3xl font-black text-white">{alerts.length}</p>
+          </div>
+      </div>
+      
+      {routers.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <NetworkMonitoring ispId={currentUser.ispId || ''} router={routers[0]} />
+          <ConnectivityReport routers={routers} />
+        </div>
+      )}
       {/* Hero Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 

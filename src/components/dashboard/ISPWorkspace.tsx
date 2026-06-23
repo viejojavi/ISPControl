@@ -22,7 +22,8 @@ import {
   Server,
   Globe,
   Lock,
-  Shield
+  Shield,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -47,6 +48,7 @@ import GeneralSettings from './GeneralSettings';
 import PlanManagement from './PlanManagement';
 import Tr069Management from './Tr069Management';
 import VpnCloudConsole from './VpnCloudConsole';
+import { NetworkMonitoring } from './NetworkMonitoring';
 import { LayoutDashboard, Settings as SettingsIcon } from 'lucide-react';
 
 interface ISPWorkspaceProps {
@@ -63,7 +65,7 @@ export default function ISPWorkspace({ currentUser, onLogout }: ISPWorkspaceProp
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'billing' | 'database' | 'infrastructure' | 'settings' | 'plans' | 'tr069' | 'vpn'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'billing' | 'database' | 'infrastructure' | 'settings' | 'plans' | 'tr069' | 'vpn' | 'monitoring'>('overview');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | null }>({
@@ -333,6 +335,21 @@ export default function ISPWorkspace({ currentUser, onLogout }: ISPWorkspaceProp
             >
               <Shield size={17} />
               <span>Cloud VPN Gateway</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('monitoring');
+                setIsMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === 'monitoring' 
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' 
+                  : 'text-gray-400 hover:bg-[#1f242c] hover:text-gray-200'
+              }`}
+            >
+              <Activity size={17} />
+              <span>Monitoreo de Red</span>
             </button>
 
             <button
@@ -687,6 +704,13 @@ export default function ISPWorkspace({ currentUser, onLogout }: ISPWorkspaceProp
             {activeTab === 'vpn' && (
               <div className="p-6">
                 <VpnCloudConsole currentUser={currentUser} />
+              </div>
+            )}
+
+            {/* Tab: Monitoring Microservice */}
+            {activeTab === 'monitoring' && (
+              <div className="p-6">
+                <NetworkMonitoring ispId={currentUser.ispId || ''} router={routers.length > 0 ? routers[0] : null} />
               </div>
             )}
 

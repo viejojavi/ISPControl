@@ -1670,3 +1670,38 @@ export async function clearISPData(ispId: string, performerEmail: string): Promi
   }
 }
 
+export interface DiscoveredDevice {
+  id: string;
+  ispId: string;
+  routerId: string;
+  ipAddress: string;
+  macAddress?: string;
+  hostname?: string;
+  status: 'Online' | 'Offline';
+  lastDiscovered: string;
+  type: 'ICMP' | 'SNMP' | 'Neighbor';
+}
+
+export async function saveDiscoveredDevice(device: DiscoveredDevice): Promise<void> {
+  const pathName = 'isp_monitored_devices';
+  try {
+    const docRef = doc(db, pathName, device.id);
+    await setDoc(docRef, device);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, pathName);
+  }
+}
+
+export async function getMonitoredDevices(ispId: string): Promise<DiscoveredDevice[]> {
+  const pathName = 'isp_monitored_devices';
+  try {
+    const q = query(collection(db, pathName), where('ispId', '==', ispId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as DiscoveredDevice);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, pathName);
+    return [];
+  }
+}
+
+

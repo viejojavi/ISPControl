@@ -41,6 +41,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Rules for isp_monitored_devices collection
+    match /isp_monitored_devices/{deviceId} {
+      allow read, write: if true;
+    }
+
     // Rules for routers collection
     match /routers/{routerId} {
       allow read, write: if true;

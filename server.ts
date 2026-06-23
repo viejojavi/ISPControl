@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { RouterOSAPI } from "routeros-client";
 import snmp from "net-snmp";
 import ping from "ping";
+import net from "net";
 import { initializeApp as initAdminApp, getApps as getAdminApps, getApp as getAdminApp } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import * as fs from "fs";
@@ -171,6 +172,116 @@ async function startServer() {
     }
   });
 
+  // Connectivity test logic
+  async function performConnectivityTest(routerIp: string, routerPort: number, user: string, password?: string) {
+    const conn = new RouterOSAPI({
+      host: routerIp,
+      user,
+      password: password || "",
+      port: routerPort || 8728,
+      timeout: 60
+    });
+
+    const targets = ['google.com', 'youtube.com', 'cloudflare.com', 'facebook.com'];
+    const results: any = {};
+    
+    await conn.connect();
+    for (const target of targets) {
+      const pingResult = await conn.write("/ping", ["=address=" + target, "=count=5"]);
+      let totalLatency = 0;
+      let count = 0;
+      const latencies: number[] = [];
+      
+      for (const res of pingResult) {
+        if (res.time) {
+          const timeMs = parseInt(res.time.replace('ms', ''));
+          totalLatency += timeMs;
+          latencies.push(timeMs);
+          count++;
+        }
+      }
+      
+      const avg = count > 0 ? totalLatency / count : 0;
+      let jitter = 0;
+      if (latencies.length > 1) {
+        let sumDiff = 0;
+        for (let i = 1; i < latencies.length; i++) {
+          sumDiff += Math.abs(latencies[i] - latencies[i - 1]);
+        }
+        jitter = sumDiff / (latencies.length - 1);
+      }
+      
+      results[target] = { avg, jitter };
+    }
+    await conn.close();
+    return results;
+  }
+
+    // 5 Minute Automation: Connectivity Monitoring
+  setInterval(async () => {
+    if (!db) return;
+    try {
+      const routersSnapshot = await db.collection("routers").get();
+      for (const doc of routersSnapshot.docs) {
+        const router = doc.data();
+        if (!router.host || !router.apiUser) continue;
+        
+        try {
+          const results = await performConnectivityTest(router.host, router.apiPort || 8728, router.apiUser, router.apiPassword);
+          await doc.ref.update({ lastConnectivity: results });
+        } catch (err) {
+          console.error(`[MONITORING] Failed for router ${router.host}:`, err);
+          // Optional: update DB with error status
+          await doc.ref.update({ lastConnectivity: { error: 'Test failed: check permissions or connectivity' } });
+        }
+      }
+    } catch (err) {
+      console.error("[MONITORING] Background task snapshot failed:", err);
+    }
+  }, 5 * 60 * 1000);
+
+  // API Route to perform a connectivity test FROM the MikroTik device
+  app.post("/api/mikrotik/connectivity-test", async (req, res) => {
+    const { routerIp, routerPort, user, password } = req.body;
+    if (!routerIp || !user) return res.status(400).json({ error: "Missing required parameters" });
+    
+    try {
+      const results = await performConnectivityTest(routerIp, routerPort, user, password);
+      res.json(results);
+    } catch (error: any) {
+      console.error("Router Connectivity Test failed:", error);
+      // Ensure we return a valid JSON object with an explicit error field
+      res.status(502).json({ error: error.message || "Connectivity Test failed" });
+    }
+  });
+
+  // API Route to ping a host FROM the MikroTik device
+  app.post("/api/mikrotik/router-ping", async (req, res) => {
+    const { routerIp, routerPort, user, password, target } = req.body;
+    if (!routerIp || !user || !target) return res.status(400).json({ error: "Missing required parameters" });
+
+    const conn = new RouterOSAPI({
+      host: routerIp,
+      user,
+      password: password || "",
+      port: routerPort || 8728,
+      timeout: 30
+    });
+
+    try {
+      await conn.connect();
+      // Using command syntax for ping in MikroTik: ["=address=" + target, "=count=5"]
+      const pingResult = await conn.write("/ping", ["=address=" + target, "=count=5"]);
+      await conn.close();
+      
+      res.json(pingResult);
+    } catch (error: any) {
+      try { await conn.close(); } catch (e) {}
+      console.error("Router Ping failed:", error);
+      res.status(502).json({ error: "Ping failed: " + error.message });
+    }
+  });
+
   // Consolidated API Route to ping a host (removing duplicate)
   app.post("/api/mikrotik/ping", async (req, res) => {
     const { host } = req.body;
@@ -280,11 +391,13 @@ async function startServer() {
 
     const snmpVersion = version === 'v1' ? snmp.Version1 : snmp.Version2c;
 
-    const session = snmp.createSession(host, community || "public", {
+    const targetHost = host;
+    const session = snmp.createSession(targetHost, community || "public", {
       port: port || 161,
       retries: 3,
-      timeout: 10000,
-      version: snmpVersion
+      timeout: 60000,
+      version: snmpVersion,
+      transport: host.includes(':') ? 'udp6' : 'udp4'
     });
 
     const sysOids = [
@@ -331,8 +444,8 @@ async function startServer() {
     };
 
     const getSystemData = () => new Promise<void>(async (resolve) => {
-      // Split OIDs into chunks of 4 to avoid SNMP GET limitations or timeouts
-      const chunkSize = 4;
+      // Split OIDs into chunks of 2 to avoid SNMP GET limitations or timeouts
+      const chunkSize = 2;
       for (let i = 0; i < sysOids.length; i += chunkSize) {
         const chunk = sysOids.slice(i, i + chunkSize);
         try {
@@ -548,6 +661,52 @@ async function startServer() {
       }
     });
   }, 5000);
+
+
+  // API Route to discover network devices via MikroTik neighbor table
+  app.post("/api/network/discover", async (req, res) => {
+    const { routerIp, routerPort, user, password } = req.body;
+    if (!routerIp || !user) return res.status(400).json({ error: "Required params missing" });
+
+    const connectWithOptions = async (attempt: number): Promise<any> => {
+      const conn = new RouterOSAPI({
+        host: routerIp,
+        user,
+        password: password || "",
+        port: routerPort || 8728,
+        timeout: 30
+      });
+      try {
+        await conn.connect();
+        const arpData = await conn.write("/ip/arp/print");
+        await conn.close();
+        return arpData;
+      } catch (err) {
+        try { await conn.close(); } catch (e) {}
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return connectWithOptions(attempt - 1);
+        }
+        throw err;
+      }
+    };
+
+    try {
+      console.log(`[Discovery] Initiating robust network discovery on ${routerIp}...`);
+      const arpData = await connectWithOptions(1); // 1 retry = total 2 attempts
+      const formattedDevices = arpData.map((d: any, idx: number) => ({
+        id: String(idx + 1),
+        ipAddress: d.address,
+        macAddress: d['mac-address'],
+        hostname: d['host-name'] || 'N/A',
+        status: 'Online'
+      }));
+      res.json(formattedDevices);
+    } catch (error: any) {
+      console.error("Discovery failed:", error);
+      res.status(502).json({ error: "Failed to discover: " + error.message });
+    }
+  });
 
   // REST Hook to register real MikroTik routers via HTTP / fetch scripting
   app.get("/api/sstp/heartbeat", (req, res) => {
@@ -785,7 +944,55 @@ async function startServer() {
     res.send("OK");
   });
 
-  // Retrieve list of connected tunnels
+  /*
+  // Management API for SSTP Gateway configs
+  app.get("/api/sstp/gateway/:ispId", async (req, res) => {
+    try {
+      const configDoc = await db.collection("sstp_configs").doc(req.params.ispId).get();
+      if (!configDoc.exists) return res.status(404).json({ error: "Config not found" });
+      res.json(configDoc.data());
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/sstp/gateway", async (req, res) => {
+    const { ispId, serverAddress, port, certificateName, secretKey } = req.body;
+    if (!ispId || !serverAddress) return res.status(400).json({ error: "Missing required params" });
+    try {
+      await db.collection("sstp_configs").doc(ispId).set({
+        ispId,
+        serverAddress,
+        port: port || 443,
+        certificateName,
+        status: "configured",
+        secretKey
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/sstp/gateway/test", (req, res) => {
+    const { serverAddress, port } = req.body;
+    if (!serverAddress || !port) return res.status(400).json({ error: "Missing required params" });
+    const socket = net.createConnection(Number(port), serverAddress, () => {
+      socket.end();
+      res.json({ status: "reachable" });
+    });
+    socket.setTimeout(5000);
+    socket.on("timeout", () => {
+      socket.destroy();
+      res.status(502).json({ error: "Connection timed out" });
+    });
+    socket.on("error", (err: any) => {
+      res.status(502).json({ error: err.message });
+    });
+  });
+  */
+
+
   app.get("/api/sstp/connections", (req, res) => {
     res.json(Array.from(activeSstpTunnels.values()));
   });
@@ -816,6 +1023,36 @@ async function startServer() {
     }
 
     res.json({ success: true, routerId });
+  });
+
+  // API Route to scan neighbors on a MikroTik device
+  app.post("/api/mikrotik/scan-neighbors", async (req, res) => {
+    const { routerIp, routerPort, user, password, pool } = req.body;
+    if (!routerIp || !user) return res.status(400).json({ error: "Missing required parameters" });
+
+    const conn = new RouterOSAPI({
+      host: routerIp,
+      user,
+      password: password || "",
+      port: routerPort || 8728,
+      timeout: 30
+    });
+
+    try {
+      await conn.connect();
+      // Obtenemos todos los neighbors y filtramos en el servidor para asegurar compatibilidad con la API
+      const neighbors = await conn.write("/ip/neighbor/print");
+      await conn.close();
+      
+      // Filtrar basado en el pool
+      const filtered = neighbors.filter((n: any) => n.address4 && n.address4.startsWith(pool));
+      res.json(filtered);
+
+    } catch (error: any) {
+      try { await conn.close(); } catch (e) {}
+      console.error("MikroTik Neighbor Scan failed:", error);
+      res.status(502).json({ error: "Scan failed: " + error.message });
+    }
   });
 
   // Allow simulator toggling

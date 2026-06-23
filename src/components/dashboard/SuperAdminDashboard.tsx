@@ -1372,42 +1372,47 @@ a la cuenta corporativa autorizada por el Kernel.
                               <td className="py-4 px-6 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
                                   
-                                  {/* billing triggers */}
-                                  <button
-                                    onClick={() => {
-                                      const matched = plans.find(p => p.id === isp.planId);
-                                      setBillingTargetISP(isp);
-                                      setManualBillAmount(String(matched?.priceMonthly || '200000'));
-                                      setManualBillDate(new Date().toISOString().substring(0, 10));
-                                    }}
-                                    className="p-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded border border-amber-500/20 cursor-pointer transition-colors"
-                                    title="Emitir cobro manual (Facturar)"
-                                  >
-                                    <DollarSign size={13} />
-                                  </button>
+                                  {/* billing triggers and plan editing in one div */}
+                                  <div className="flex flex-row items-center gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        const matched = plans.find(p => p.id === isp.planId);
+                                        setBillingTargetISP(isp);
+                                        setManualBillAmount(String(matched?.priceMonthly || '200000'));
+                                        setManualBillDate(new Date().toISOString().substring(0, 10));
+                                      }}
+                                      className="p-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded border border-amber-500/20 cursor-pointer transition-colors"
+                                      title="Emitir cobro manual (Facturar)"
+                                    >
+                                      <DollarSign size={13} />
+                                    </button>
 
-                                  <button
-                                    onClick={() => {
-                                      setEditingISP(isp);
-                                      setEditIspName(isp.name);
-                                      setEditIspPlan(isp.planId);
-                                      setEditIspBilling(isp.billingType);
-                                      setEditIspStatus(isp.status);
-                                      setEditIspPassword('');
-                                    }}
-                                    className="p-1.5 hover:bg-gray-800 text-gray-400 hover:text-white rounded cursor-pointer transition-colors"
-                                    title="Modificar asignaciones de plan"
-                                  >
-                                    <Edit3 size={13} />
-                                  </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingISP(isp);
+                                        setEditIspName(isp.name);
+                                        setEditIspPlan(isp.planId);
+                                        setEditIspBilling(isp.billingType);
+                                        setEditIspStatus(isp.status);
+                                        setEditIspPassword('');
+                                      }}
+                                      className="p-1.5 hover:bg-gray-800 text-gray-400 hover:text-white rounded cursor-pointer transition-colors"
+                                      title="Modificar asignaciones de plan"
+                                    >
+                                      <Edit3 size={13} />
+                                    </button>
+                                  </div>
                                   
-                                  <button
-                                    onClick={() => handleDeleteISPClick(isp)}
-                                    className="p-1.5 hover:bg-rose-950/20 text-gray-450 hover:text-rose-400 rounded cursor-pointer transition-colors"
-                                    title="Inactivar y purgar"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
+                                  {/* Delete action in a separate div */}
+                                  <div className="flex justify-end ml-1">
+                                    <button
+                                      onClick={() => handleDeleteISPClick(isp)}
+                                      className="p-1.5 hover:bg-rose-950/20 text-gray-450 hover:text-rose-400 rounded cursor-pointer transition-colors"
+                                      title="Inactivar y purgar"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
                                 </div>
                               </td>
                             </tr>
